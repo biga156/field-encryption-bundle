@@ -1,0 +1,53 @@
+{
+    "name": "biga/field-encryption-bundle",
+    "description": "A Symfony bundle for transparent Doctrine entity field encryption using AES-256-CBC",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "keywords": [
+        "symfony",
+        "bundle",
+        "encryption",
+        "doctrine",
+        "aes",
+        "security",
+        "gdpr"
+    ],
+    "authors": [
+        {
+            "name": "Bíró Gábor",
+            "email": "biga156@example.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "symfony/framework-bundle": "^7.0",
+        "symfony/console": "^7.0",
+        "symfony/dependency-injection": "^7.0",
+        "symfony/config": "^7.0",
+        "doctrine/orm": "^3.0",
+        "doctrine/doctrine-bundle": "^2.11"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0",
+        "symfony/phpunit-bridge": "^7.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Biga\\FieldEncryptionBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Biga\\FieldEncryptionBundle\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.0-dev"
+        }
+    },
+    "minimum-stability": "stable"
+}
