@@ -106,7 +106,7 @@ class FieldEncryptionService
      * Creates a hash of the given value for searchability.
      *
      * This allows searching/matching on encrypted fields without exposing the actual value.
-     * Uses SHA-256 with the encryption key as additional entropy.
+     * Uses plain SHA-256 hash with normalized (lowercase, trimmed) input.
      *
      * @param string $value The value to hash
      *
@@ -114,7 +114,7 @@ class FieldEncryptionService
      */
     public function hash(string $value): string
     {
-        return hash_hmac('sha256', mb_strtolower(trim($value)), $this->encryptionKey);
+        return hash('sha256', mb_strtolower(trim($value)));
     }
 
     /**

@@ -8,15 +8,16 @@ use Biga\FieldEncryptionBundle\Service\FieldEncryptionService;
 use Biga\FieldEncryptionBundle\Service\FieldMapping;
 use Biga\FieldEncryptionBundle\Service\FieldMappingResolver;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Event\PostLoadEventArgs;
+use Doctrine\ORM\Event\PrePersistEventArgs;
 use Doctrine\ORM\Event\PreUpdateEventArgs;
 use Doctrine\ORM\Events;
-use Doctrine\Persistence\Event\LifecycleEventArgs;
 use ReflectionClass;
 use Symfony\Component\Uid\Ulid;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Doctrine event subscriber that automatically encrypts and decrypts entity fields
+ * Doctrine event listener that automatically encrypts and decrypts entity fields
  * marked with the #[Encrypted] attribute or configured via YAML.
  *
  * This listener integrates with {@see FieldEncryptionService} to ensure that
@@ -43,13 +44,12 @@ class FieldEncryptionListener
      *
      * Encrypts all marked fields before the entity is initially persisted.
      *
-     * @param object             $entity The entity being persisted
-     * @param LifecycleEventArgs $args   Event arguments
-     *
-     * @phpstan-ignore missingType.generics
+     * @param PrePersistEventArgs $args Event arguments containing the entity
      */
-    public function prePersist(object $entity, LifecycleEventArgs $args): void
+    public function prePersist(PrePersistEventArgs $args): void
     {
+        $entity = $args->getObject();
+
         if (!$this->mappingResolver->hasEncryptedFields($entity)) {
             return;
         }
@@ -63,11 +63,12 @@ class FieldEncryptionListener
      * Encrypts all marked fields before the entity is updated, then recomputes
      * the Doctrine change set to ensure the updated encrypted values are persisted.
      *
-     * @param object             $entity The entity being updated
-     * @param PreUpdateEventArgs $args   Event arguments
+     * @param PreUpdateEventArgs $args Event arguments containing the entity
      */
-    public function preUpdate(object $entity, PreUpdateEventArgs $args): void
+    public function preUpdate(PreUpdateEventArgs $args): void
     {
+        $entity = $args->getObject();
+
         if (!$this->mappingResolver->hasEncryptedFields($entity)) {
             return;
         }
@@ -89,13 +90,12 @@ class FieldEncryptionListener
      * Decrypts all encrypted fields after the entity is loaded from the database
      * and sets them into the corresponding plain properties.
      *
-     * @param object             $entity The entity that was loaded
-     * @param LifecycleEventArgs $args   Event arguments
-     *
-     * @phpstan-ignore missingType.generics
+     * @param PostLoadEventArgs $args Event arguments containing the entity
      */
-    public function postLoad(object $entity, LifecycleEventArgs $args): void
+    public function postLoad(PostLoadEventArgs $args): void
     {
+        $entity = $args->getObject();
+
         if (!$this->mappingResolver->hasEncryptedFields($entity)) {
             return;
         }
@@ -149,21 +149,21 @@ class FieldEncryptionListener
         FieldMapping $mapping,
         string $entityId,
     ): void {
-        // Get the plain value from the source property
-        $plainValue = $this->getPropertyValue($entity, $reflection, $mapping->sourceProperty);
+        // Get the plain value from the plain property (not source property getter which might return unexpected values)
+        $plainValue = $this->getPropertyValue($entity, $reflection, $mapping->plainProperty);
 
         if (null === $plainValue || '' === $plainValue) {
             return;
         }
 
-        // Encrypt and set the encrypted value
+        // Encrypt and set the encrypted value directly to the property (avoid setter which might have side effects)
         $encryptedValue = $this->encryptionService->encrypt($plainValue, $entityId);
-        $this->setPropertyValue($entity, $reflection, $mapping->encryptedProperty, $encryptedValue);
+        $this->setPropertyValueDirect($entity, $reflection, $mapping->encryptedProperty, $encryptedValue);
 
-        // Set hash if configured
+        // Set hash if configured (also direct to avoid setter side effects)
         if ($mapping->hashField && null !== $mapping->hashProperty) {
             $hash = $this->encryptionService->hash($plainValue);
-            $this->setPropertyValue($entity, $reflection, $mapping->hashProperty, $hash);
+            $this->setPropertyValueDirect($entity, $reflection, $mapping->hashProperty, $hash);
         }
     }
 
@@ -181,8 +181,8 @@ class FieldEncryptionListener
         FieldMapping $mapping,
         string $entityId,
     ): void {
-        // Get the encrypted value
-        $encryptedValue = $this->getPropertyValue($entity, $reflection, $mapping->encryptedProperty);
+        // Get the encrypted value directly from the property (bypass getter to avoid side effects)
+        $encryptedValue = $this->getPropertyValueDirect($entity, $reflection, $mapping->encryptedProperty);
 
         if (null === $encryptedValue) {
             return;
@@ -238,6 +238,8 @@ class FieldEncryptionListener
     /**
      * Gets a property value from an entity using reflection.
      *
+     * Tries the getter method first, then falls back to direct property access.
+     *
      * @param object          $entity       The entity
      * @param ReflectionClass $reflection   The reflection class
      * @param string          $propertyName The property name
@@ -257,6 +259,30 @@ class FieldEncryptionListener
         }
 
         // Fall back to direct property access
+        if ($reflection->hasProperty($propertyName)) {
+            $property = $reflection->getProperty($propertyName);
+            $property->setAccessible(true);
+
+            return $property->getValue($entity);
+        }
+
+        return null;
+    }
+
+    /**
+     * Gets a property value directly using reflection, bypassing getter methods.
+     *
+     * This is used for encrypted properties where the getter might return a different
+     * value (e.g., the decrypted value instead of the encrypted one).
+     *
+     * @param object          $entity       The entity
+     * @param ReflectionClass $reflection   The reflection class
+     * @param string          $propertyName The property name
+     *
+     * @return mixed The property value
+     */
+    private function getPropertyValueDirect(object $entity, ReflectionClass $reflection, string $propertyName): mixed
+    {
         if ($reflection->hasProperty($propertyName)) {
             $property = $reflection->getProperty($propertyName);
             $property->setAccessible(true);
@@ -290,6 +316,26 @@ class FieldEncryptionListener
         }
 
         // Fall back to direct property access
+        if ($reflection->hasProperty($propertyName)) {
+            $property = $reflection->getProperty($propertyName);
+            $property->setAccessible(true);
+            $property->setValue($entity, $value);
+        }
+    }
+
+    /**
+     * Sets a property value directly using reflection, bypassing setter methods.
+     *
+     * This is used for encrypted properties to avoid triggering setter side effects
+     * (e.g., a setter that modifies other properties or performs validation).
+     *
+     * @param object          $entity       The entity
+     * @param ReflectionClass $reflection   The reflection class
+     * @param string          $propertyName The property name
+     * @param mixed           $value        The value to set
+     */
+    private function setPropertyValueDirect(object $entity, ReflectionClass $reflection, string $propertyName, mixed $value): void
+    {
         if ($reflection->hasProperty($propertyName)) {
             $property = $reflection->getProperty($propertyName);
             $property->setAccessible(true);
