@@ -29,12 +29,12 @@ class FieldMappingResolver
     private array $cache = [];
 
     /**
-     * @var array<string, array<string, array{encrypted_property?: string, plain_property?: string, hash_field?: bool, hash_property?: string}>>
+     * @var array<string, array{id_property?: string, fields?: array<string, array{encrypted_property?: string, plain_property?: string, hash_field?: bool, hash_property?: string}>}>
      */
     private array $yamlConfig;
 
     /**
-     * @param array<string, array<string, array{encrypted_property?: string, plain_property?: string, hash_field?: bool, hash_property?: string}>> $yamlConfig YAML configuration for entity field mappings
+     * @param array<string, array{id_property?: string, fields?: array<string, array{encrypted_property?: string, plain_property?: string, hash_field?: bool, hash_property?: string}>}> $yamlConfig YAML configuration for entity field mappings
      */
     public function __construct(array $yamlConfig = [])
     {
@@ -59,15 +59,15 @@ class FieldMappingResolver
         $mappings = [];
 
         // First, check YAML configuration
-        if (isset($this->yamlConfig[$className])) {
-            foreach ($this->yamlConfig[$className] as $propertyName => $config) {
+        if (isset($this->yamlConfig[$className]['fields'])) {
+            foreach ($this->yamlConfig[$className]['fields'] as $propertyName => $config) {
                 $mappings[$propertyName] = $this->createMappingFromConfig($propertyName, $config);
             }
         }
 
         // Then, check attributes (attributes override YAML config)
         $reflection = new ReflectionClass($entity);
-        $idMethod   = $this->resolveIdMethod($reflection);
+        $idMethod   = $this->resolveIdMethod($reflection, $className);
 
         foreach ($reflection->getProperties() as $property) {
             $attributes = $property->getAttributes(Encrypted::class);
@@ -119,10 +119,22 @@ class FieldMappingResolver
     }
 
     /**
-     * Resolves the ID method from the EncryptedEntity attribute or defaults to 'getId'.
+     * Resolves the ID method from YAML config, EncryptedEntity attribute, or defaults to 'getId'.
+     *
+     * Priority:
+     * 1. YAML configuration (id_property)
+     * 2. EncryptedEntity attribute (idMethod)
+     * 3. Default 'getId'
      */
-    private function resolveIdMethod(ReflectionClass $reflection): string
+    private function resolveIdMethod(ReflectionClass $reflection, string $className): string
     {
+        // First, check YAML configuration
+        if (isset($this->yamlConfig[$className]['id_property'])) {
+            $idProperty = $this->yamlConfig[$className]['id_property'];
+            return 'get' . ucfirst($idProperty);
+        }
+
+        // Then, check EncryptedEntity attribute
         $attributes = $reflection->getAttributes(EncryptedEntity::class);
 
         if (!empty($attributes)) {
