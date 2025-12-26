@@ -20,20 +20,20 @@ A reusable Symfony bundle for transparent Doctrine entity field encryption using
 
 ## Installation
 
-### Via Composer (Local Path - Development)
+### Via Composer (Private Git Repository)
 
-Add the repository to your project's `composer.json`:
+Add the Gitea repository to your project's `composer.json`:
 
 ```json
 {
     "repositories": [
         {
-            "type": "path",
-            "url": "../field-encryption-bundle"
+            "type": "vcs",
+            "url": "https://gitea.caeligo.com/biga/FieldEncryptionBundle.git"
         }
     ],
     "require": {
-        "biga/field-encryption-bundle": "@dev"
+        "biga/field-encryption-bundle": "^1.0"
     }
 }
 ```
@@ -44,30 +44,44 @@ Then run:
 composer update biga/field-encryption-bundle
 ```
 
-### Via Composer (Packagist - Production)
+> **Note:** You need access to the private repository. Configure your credentials via:
+> - SSH key authentication, or
+> - HTTPS with token: `composer config --global http-basic.gitea.caeligo.com <username> <token>`
 
-Once published to Packagist:
+### Via Composer (Packagist - Future)
+
+Once published to Packagist, installation will be simplified to:
 
 ```bash
 composer require biga/field-encryption-bundle
 ```
 
-### Manual Installation
+### Via Composer (Local Path - Development)
 
-1. Copy the bundle to your project (e.g., `lib/field-encryption-bundle`)
-2. Add to `composer.json`:
+For local development, symlink the bundle:
 
 ```json
 {
-    "autoload": {
-        "psr-4": {
-            "Biga\\FieldEncryptionBundle\\": "lib/field-encryption-bundle/src/"
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../field-encryption-bundle",
+            "options": {
+                "symlink": true
+            }
         }
+    ],
+    "require": {
+        "biga/field-encryption-bundle": "@dev"
     }
 }
 ```
 
-3. Run `composer dump-autoload`
+## About the Namespace
+
+The `Biga\FieldEncryptionBundle` namespace follows Composer/PSR-4 conventions where `Biga` is the **vendor name** (publisher/author identifier), similar to how Symfony uses `Symfony\`, Doctrine uses `Doctrine\`, etc.
+
+This namespace works regardless of where the package is installed - Composer's autoloader handles the mapping between namespace and filesystem location automatically. You can install this bundle in any project, in any directory structure.
 
 ## Configuration
 
@@ -334,3 +348,8 @@ MIT License
 ## Author
 
 Bíró Gábor (biga156)
+
+## Repository
+
+- **Private Git**: https://gitea.caeligo.com/biga/FieldEncryptionBundle
+- **Packagist**: *(Coming soon)*
