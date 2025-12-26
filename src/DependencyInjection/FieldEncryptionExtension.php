@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Biga\FieldEncryptionBundle\DependencyInjection;
+namespace Caeligo\FieldEncryptionBundle\DependencyInjection;
 
-use Biga\FieldEncryptionBundle\Command\GenerateEncryptionKeyCommand;
-use Biga\FieldEncryptionBundle\EventListener\FieldEncryptionListener;
-use Biga\FieldEncryptionBundle\Service\FieldEncryptionService;
-use Biga\FieldEncryptionBundle\Service\FieldMappingResolver;
+use Caeligo\FieldEncryptionBundle\Command\GenerateEncryptionKeyCommand;
+use Caeligo\FieldEncryptionBundle\EventListener\FieldEncryptionListener;
+use Caeligo\FieldEncryptionBundle\Service\FieldEncryptionService;
+use Caeligo\FieldEncryptionBundle\Service\FieldMappingResolver;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;

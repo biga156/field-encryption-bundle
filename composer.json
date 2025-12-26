@@ -1,5 +1,5 @@
 {
-    "name": "biga/field-encryption-bundle",
+    "name": "caeligo/field-encryption-bundle",
     "description": "A Symfony bundle for transparent Doctrine entity field encryption using AES-256-CBC",
     "type": "symfony-bundle",
     "license": "MIT",
@@ -33,12 +33,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Biga\\FieldEncryptionBundle\\": "src/"
+            "Caeligo\\FieldEncryptionBundle\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Biga\\FieldEncryptionBundle\\Tests\\": "tests/"
+            "Caeligo\\FieldEncryptionBundle\\Tests\\": "tests/"
         }
     },
     "config": {

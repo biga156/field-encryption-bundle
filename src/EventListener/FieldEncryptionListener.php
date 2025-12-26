@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Biga\FieldEncryptionBundle\EventListener;
+namespace Caeligo\FieldEncryptionBundle\EventListener;
 
-use Biga\FieldEncryptionBundle\Service\FieldEncryptionService;
-use Biga\FieldEncryptionBundle\Service\FieldMapping;
-use Biga\FieldEncryptionBundle\Service\FieldMappingResolver;
+use Caeligo\FieldEncryptionBundle\Service\FieldEncryptionService;
+use Caeligo\FieldEncryptionBundle\Service\FieldMapping;
+use Caeligo\FieldEncryptionBundle\Service\FieldMappingResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostLoadEventArgs;
 use Doctrine\ORM\Event\PrePersistEventArgs;

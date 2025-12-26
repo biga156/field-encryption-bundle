@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Biga\FieldEncryptionBundle\Service;
+namespace Caeligo\FieldEncryptionBundle\Service;
 
 /**
  * Service for symmetric encryption and decryption using the AES-256-CBC algorithm.

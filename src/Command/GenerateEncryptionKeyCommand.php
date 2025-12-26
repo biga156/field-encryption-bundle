@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Biga\FieldEncryptionBundle\Command;
+namespace Caeligo\FieldEncryptionBundle\Command;
 
-use Biga\FieldEncryptionBundle\Service\FieldEncryptionService;
+use Caeligo\FieldEncryptionBundle\Service\FieldEncryptionService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

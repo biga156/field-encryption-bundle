@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Biga\FieldEncryptionBundle\Service;
+namespace Caeligo\FieldEncryptionBundle\Service;
 
 /**
  * Represents the mapping configuration for a single encrypted field.

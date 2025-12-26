@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Biga\FieldEncryptionBundle;
+namespace Caeligo\FieldEncryptionBundle;
 
-use Biga\FieldEncryptionBundle\DependencyInjection\FieldEncryptionExtension;
+use Caeligo\FieldEncryptionBundle\DependencyInjection\FieldEncryptionExtension;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 

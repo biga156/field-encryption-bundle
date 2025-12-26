@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Biga\FieldEncryptionBundle\Attribute;
+namespace Caeligo\FieldEncryptionBundle\Attribute;
 
 use Attribute;
 

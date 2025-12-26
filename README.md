@@ -33,7 +33,7 @@ Add the Gitea repository to your project's `composer.json`:
         }
     ],
     "require": {
-        "biga/field-encryption-bundle": "^1.0"
+        "caeligo/field-encryption-bundle": "^1.0"
     }
 }
 ```
@@ -41,7 +41,7 @@ Add the Gitea repository to your project's `composer.json`:
 Then run:
 
 ```bash
-composer update biga/field-encryption-bundle
+composer update caeligo/field-encryption-bundle
 ```
 
 > **Note:** You need access to the private repository. Configure your credentials via:
@@ -53,7 +53,7 @@ composer update biga/field-encryption-bundle
 Once published to Packagist, installation will be simplified to:
 
 ```bash
-composer require biga/field-encryption-bundle
+composer require caeligo/field-encryption-bundle
 ```
 
 ### Via Composer (Local Path - Development)
@@ -72,14 +72,14 @@ For local development, symlink the bundle:
         }
     ],
     "require": {
-        "biga/field-encryption-bundle": "@dev"
+        "caeligo/field-encryption-bundle": "@dev"
     }
 }
 ```
 
 ## About the Namespace
 
-The `Biga\FieldEncryptionBundle` namespace follows Composer/PSR-4 conventions where `Biga` is the **vendor name** (publisher/author identifier), similar to how Symfony uses `Symfony\`, Doctrine uses `Doctrine\`, etc.
+The `Caeligo\FieldEncryptionBundle` namespace follows Composer/PSR-4 conventions where `Caeligo` is the **vendor name** (publisher/author identifier), similar to how Symfony uses `Symfony\`, Doctrine uses `Doctrine\`, etc.
 
 This namespace works regardless of where the package is installed - Composer's autoloader handles the mapping between namespace and filesystem location automatically. You can install this bundle in any project, in any directory structure.
 
@@ -92,7 +92,7 @@ In `config/bundles.php`:
 ```php
 return [
     // ... other bundles
-    Biga\FieldEncryptionBundle\FieldEncryptionBundle::class => ['all' => true],
+    Caeligo\FieldEncryptionBundle\FieldEncryptionBundle::class => ['all' => true],
 ];
 ```
 
@@ -188,8 +188,8 @@ class Customer
 You can also use PHP attributes directly on entity properties:
 
 ```php
-use Biga\FieldEncryptionBundle\Attribute\Encrypted;
-use Biga\FieldEncryptionBundle\Attribute\EncryptedEntity;
+use Caeligo\FieldEncryptionBundle\Attribute\Encrypted;
+use Caeligo\FieldEncryptionBundle\Attribute\EncryptedEntity;
 
 #[EncryptedEntity(idMethod: 'getId')]  // or 'getUlid' for entities with integer IDs
 class User

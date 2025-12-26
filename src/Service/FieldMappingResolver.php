@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Biga\FieldEncryptionBundle\Service;
+namespace Caeligo\FieldEncryptionBundle\Service;
 
-use Biga\FieldEncryptionBundle\Attribute\Encrypted;
-use Biga\FieldEncryptionBundle\Attribute\EncryptedEntity;
+use Caeligo\FieldEncryptionBundle\Attribute\Encrypted;
+use Caeligo\FieldEncryptionBundle\Attribute\EncryptedEntity;
 use ReflectionClass;
 use ReflectionProperty;
 
