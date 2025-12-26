@@ -29,7 +29,7 @@ Add the Gitea repository to your project's `composer.json`:
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://gitea.caeligo.com/biga/FieldEncryptionBundle.git"
+            "url": "https://gitea.caeligo.com/CAELIGO/FieldEncryptionBundle.git"
         }
     ],
     "require": {
@@ -351,5 +351,5 @@ Bíró Gábor (biga156)
 
 ## Repository
 
-- **Private Git**: https://gitea.caeligo.com/biga/FieldEncryptionBundle
+- **Private Git**: https://gitea.caeligo.com/CAELIGO/FieldEncryptionBundle
 - **Packagist**: *(Coming soon)*
