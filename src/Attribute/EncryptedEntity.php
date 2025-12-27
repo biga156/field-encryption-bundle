@@ -7,18 +7,41 @@ namespace Caeligo\FieldEncryptionBundle\Attribute;
 use Attribute;
 
 /**
- * Marks an entity class as having encrypted fields.
+ * Marks an entity class as having encrypted fields and configures encryption key derivation.
  *
- * This attribute is optional when using the #[Encrypted] attribute on individual properties,
- * but can be used to explicitly enable encryption processing for an entity and to configure
- * entity-level encryption settings.
+ * The encryption key for each entity instance is derived from:
+ * - The master key (from FIELD_ENCRYPTION_KEY environment variable)
+ * - The entity's unique identifier (ULID/UUID) specified by idProperty
  *
- * Usage:
+ * This ensures each entity has a unique encryption key, providing better security
+ * than using a single key for all data.
+ *
+ * Usage with ULID as primary key (most common):
  * ```php
- * #[EncryptedEntity(idMethod: 'getId')]
+ * #[EncryptedEntity]  // Uses 'id' property by default
  * class User {
+ *     #[ORM\Id]
+ *     #[ORM\Column(type: 'ulid')]
+ *     private ?Ulid $id = null;
+ *
  *     #[Encrypted]
  *     private ?string $email = null;
+ * }
+ * ```
+ *
+ * Usage with integer ID and separate ULID property:
+ * ```php
+ * #[EncryptedEntity(idProperty: 'ulid')]
+ * class Customer {
+ *     #[ORM\Id]
+ *     #[ORM\GeneratedValue]
+ *     private ?int $id = null;
+ *
+ *     #[ORM\Column(type: 'ulid')]
+ *     private ?Ulid $ulid = null;  // Used for key derivation
+ *
+ *     #[Encrypted]
+ *     private ?string $phone = null;
  * }
  * ```
  *
@@ -28,11 +51,18 @@ use Attribute;
 class EncryptedEntity
 {
     /**
-     * @param string $idMethod The method name to get the entity's unique identifier for key derivation.
-     *                         Default is 'getId'. The method should return a Ulid, Uuid, or string.
+     * The getter method name, derived from idProperty.
+     */
+    public readonly string $idMethod;
+
+    /**
+     * @param string $idProperty The property name containing the ULID/UUID for key derivation.
+     *                           Default is 'id'. The getter method will be 'get' + ucfirst(idProperty).
+     *                           Example: 'ulid' -> getUlid(), 'publicId' -> getPublicId()
      */
     public function __construct(
-        public readonly string $idMethod = 'getId',
+        public readonly string $idProperty = 'id',
     ) {
+        $this->idMethod = 'get' . ucfirst($this->idProperty);
     }
 }

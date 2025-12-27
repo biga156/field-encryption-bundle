@@ -149,13 +149,13 @@ class User
 Class-level attribute to configure entity-wide encryption settings.
 
 ```php
-#[EncryptedEntity(idMethod: 'getId')]
+#[EncryptedEntity]  // Uses 'id' property by default
 class User { ... }
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `idMethod` | string | `'getId'` | Method name returning the ULID/UUID for key derivation |
+| `idProperty` | string | `'id'` | Property name containing the ULID/UUID for key derivation |
 
 ### `#[Encrypted]`
 
@@ -383,7 +383,7 @@ If your entity uses auto-increment integer as primary key, you need a separate U
 
 ```php
 #[ORM\Entity]
-#[EncryptedEntity(idMethod: 'getUlid')]  // Use getUlid() instead of getId()
+#[EncryptedEntity(idProperty: 'ulid')]  // Use getUlid() instead of getId()
 class Customer
 {
     #[ORM\Id]
