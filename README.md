@@ -485,4 +485,4 @@ Bíró Gábor (biga156)
 
 ## Repository
 
-- **Private Git**: https://gitea.caeligo.com/CAELIGO/FieldEncryptionBundle
+- **GitHub**: https://github.com/biga156/field-encryption-bundle
