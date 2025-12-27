@@ -13,19 +13,16 @@ use Attribute;
  * - Encrypt the value before persisting to the database
  * - Decrypt the value after loading from the database
  *
- * The property requires a corresponding "encrypted" storage field in the database
- * and optionally a "plain" property for the decrypted value.
+ * The property where this attribute is placed stores the encrypted value in the database.
+ * A corresponding "plain*" property is used for the decrypted value (transient, not persisted).
  *
- * Usage:
+ * Usage (simple - property stores encrypted value directly):
  * ```php
- * #[Encrypted(encryptedProperty: 'encryptedEmail', plainProperty: 'plainEmail')]
- * private ?string $email = null;
- * ```
+ * #[ORM\Column(type: Types::TEXT, nullable: true)]
+ * #[Encrypted(hashField: true, hashProperty: 'emailHash')]
+ * private ?string $email = null;  // Stores encrypted value
  *
- * Or with YAML configuration, the attribute can be used without parameters:
- * ```php
- * #[Encrypted]
- * private ?string $email = null;
+ * private ?string $plainEmail = null;  // Transient, stores decrypted value
  * ```
  *
  * @author Bíró Gábor (biga156)
@@ -35,7 +32,7 @@ class Encrypted
 {
     /**
      * @param string|null $encryptedProperty The property name that stores the encrypted value (database column).
-     *                                       If null, defaults to 'encrypted' + ucfirst(propertyName).
+     *                                       If null, defaults to the property name where this attribute is placed.
      * @param string|null $plainProperty     The property name that stores the decrypted value (not persisted).
      *                                       If null, defaults to 'plain' + ucfirst(propertyName).
      * @param bool        $hashField         Whether to also create a hash of the value for searchability.

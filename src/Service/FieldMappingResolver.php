@@ -156,7 +156,7 @@ class FieldMappingResolver
 
         return new FieldMapping(
             sourceProperty: $propertyName,
-            encryptedProperty: $encrypted->encryptedProperty ?? 'encrypted' . ucfirst($propertyName),
+            encryptedProperty: $encrypted->encryptedProperty ?? $propertyName,
             plainProperty: $encrypted->plainProperty ?? 'plain' . ucfirst($propertyName),
             hashField: $encrypted->hashField,
             hashProperty: $encrypted->hashProperty ?? ($encrypted->hashField ? $propertyName . 'Hash' : null),
