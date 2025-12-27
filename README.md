@@ -20,33 +20,21 @@ A reusable Symfony bundle for transparent Doctrine entity field encryption using
 
 ## Installation
 
-### Via Composer (Private Git Repository)
+### Via Composer (Packagist)
 
-Add the Gitea repository to your project's `composer.json`:
-
-```json
-{
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://gitea.caeligo.com/CAELIGO/FieldEncryptionBundle.git"
-        }
-    ],
-    "require": {
-        "caeligo/field-encryption-bundle": "^1.0"
-    }
-}
-```
-
-Then run:
+The easiest way to install the bundle is via Composer from Packagist:
 
 ```bash
-composer update caeligo/field-encryption-bundle
+composer require caeligo/field-encryption-bundle
 ```
 
-> **Note:** You need access to the private repository. Configure your credentials via:
-> - SSH key authentication, or
-> - HTTPS with token: `composer config --global http-basic.gitea.caeligo.com <username> <token>`
+This will automatically pull the latest stable version from [Packagist](https://packagist.org/packages/caeligo/field-encryption-bundle).
+
+Alternatively, you can specify a version constraint:
+
+```bash
+composer require "caeligo/field-encryption-bundle:^1.0"
+```
 
 ## Quick Start
 
