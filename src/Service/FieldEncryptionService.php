@@ -88,7 +88,12 @@ class FieldEncryptionService
             return null;
         }
 
-        $decoded = json_decode(base64_decode($encodedPayload, true), true);
+        $base64Decoded = base64_decode($encodedPayload, true);
+        if ($base64Decoded === false) {
+            return null;
+        }
+
+        $decoded = json_decode($base64Decoded, true);
 
         if (!\is_array($decoded) || !isset($decoded['iv'], $decoded['value'])) {
             return null;

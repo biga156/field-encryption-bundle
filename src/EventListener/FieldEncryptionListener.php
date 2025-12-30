@@ -4,24 +4,29 @@ declare(strict_types=1);
 
 namespace Caeligo\FieldEncryptionBundle\EventListener;
 
+use Caeligo\FieldEncryptionBundle\Model\EncryptedFileData;
+use Caeligo\FieldEncryptionBundle\Service\BinaryEncryptionService;
 use Caeligo\FieldEncryptionBundle\Service\FieldEncryptionService;
 use Caeligo\FieldEncryptionBundle\Service\FieldMapping;
 use Caeligo\FieldEncryptionBundle\Service\FieldMappingResolver;
+use Caeligo\FieldEncryptionBundle\Service\FileFieldMapping;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostLoadEventArgs;
 use Doctrine\ORM\Event\PrePersistEventArgs;
 use Doctrine\ORM\Event\PreUpdateEventArgs;
 use Doctrine\ORM\Events;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use ReflectionClass;
 use Symfony\Component\Uid\Ulid;
 use Symfony\Component\Uid\Uuid;
 
 /**
  * Doctrine event listener that automatically encrypts and decrypts entity fields
- * marked with the #[Encrypted] attribute or configured via YAML.
+ * marked with the #[Encrypted] or #[EncryptedFile] attributes or configured via YAML.
  *
- * This listener integrates with {@see FieldEncryptionService} to ensure that
- * marked fields are stored in encrypted form in the database, while
+ * This listener integrates with {@see FieldEncryptionService} and {@see BinaryEncryptionService}
+ * to ensure that marked fields are stored in encrypted form in the database, while
  * transparently decrypting them when entities are loaded.
  *
  * Registered for the following Doctrine lifecycle events:
@@ -36,6 +41,8 @@ class FieldEncryptionListener
     public function __construct(
         private FieldEncryptionService $encryptionService,
         private FieldMappingResolver $mappingResolver,
+        private BinaryEncryptionService $binaryEncryptionService,
+        private LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -106,11 +113,18 @@ class FieldEncryptionListener
             return;
         }
 
-        $mappings   = $this->mappingResolver->getMappings($entity);
         $reflection = new ReflectionClass($entity);
 
+        // Decrypt string fields
+        $mappings = $this->mappingResolver->getMappings($entity);
         foreach ($mappings as $mapping) {
             $this->decryptField($entity, $reflection, $mapping, $entityId);
+        }
+
+        // Decrypt file fields
+        $fileMappings = $this->mappingResolver->getFileMappings($entity);
+        foreach ($fileMappings as $fileMapping) {
+            $this->decryptFileField($entity, $reflection, $fileMapping, $entityId);
         }
     }
 
@@ -127,16 +141,23 @@ class FieldEncryptionListener
             return;
         }
 
-        $mappings   = $this->mappingResolver->getMappings($entity);
         $reflection = new ReflectionClass($entity);
 
+        // Encrypt string fields
+        $mappings = $this->mappingResolver->getMappings($entity);
         foreach ($mappings as $mapping) {
             $this->encryptField($entity, $reflection, $mapping, $entityId);
+        }
+
+        // Encrypt file fields
+        $fileMappings = $this->mappingResolver->getFileMappings($entity);
+        foreach ($fileMappings as $fileMapping) {
+            $this->encryptFileField($entity, $reflection, $fileMapping, $entityId);
         }
     }
 
     /**
-     * Encrypts a single field.
+     * Encrypts a single string field.
      *
      * @param object          $entity     The entity
      * @param ReflectionClass $reflection The reflection class
@@ -165,10 +186,74 @@ class FieldEncryptionListener
             $hash = $this->encryptionService->hash($plainValue);
             $this->setPropertyValueDirect($entity, $reflection, $mapping->hashProperty, $hash);
         }
+
+        $this->logger->debug('Encrypted string field', [
+            'entity' => $entity::class,
+            'field' => $mapping->encryptedProperty,
+        ]);
     }
 
     /**
-     * Decrypts a single field.
+     * Encrypts a single file field.
+     *
+     * @param object           $entity     The entity
+     * @param ReflectionClass  $reflection The reflection class
+     * @param FileFieldMapping $mapping    The file field mapping
+     * @param string           $entityId   The entity ID for key derivation
+     */
+    private function encryptFileField(
+        object $entity,
+        ReflectionClass $reflection,
+        FileFieldMapping $mapping,
+        string $entityId,
+    ): void {
+        $plainValue = $this->getPropertyValue($entity, $reflection, $mapping->plainProperty);
+
+        if (null === $plainValue) {
+            return;
+        }
+
+        // Handle both DTO and string plain types
+        if ($mapping->isDtoType() && $plainValue instanceof EncryptedFileData) {
+            $encryptedValue = $this->binaryEncryptionService->encryptFileData(
+                $plainValue,
+                $entityId,
+                $mapping->compress,
+                $mapping->maxSize,
+            );
+
+            // Set metadata properties if configured
+            $this->setMetadataFromDto($entity, $reflection, $mapping, $plainValue);
+        } elseif ($mapping->isStringType() && is_string($plainValue)) {
+            $encryptedValue = $this->binaryEncryptionService->encrypt(
+                $plainValue,
+                $entityId,
+                [],
+                $mapping->compress,
+                $mapping->maxSize,
+                $mapping->chunkSize,
+            );
+        } else {
+            $this->logger->warning('Invalid plain value type for file field', [
+                'entity' => $entity::class,
+                'field' => $mapping->sourceProperty,
+                'expectedType' => $mapping->plainType,
+                'actualType' => get_debug_type($plainValue),
+            ]);
+            return;
+        }
+
+        $this->setPropertyValueDirect($entity, $reflection, $mapping->sourceProperty, $encryptedValue);
+
+        $this->logger->debug('Encrypted file field', [
+            'entity' => $entity::class,
+            'field' => $mapping->sourceProperty,
+            'compressed' => $mapping->compress ?? false,
+        ]);
+    }
+
+    /**
+     * Decrypts a single string field.
      *
      * @param object          $entity     The entity
      * @param ReflectionClass $reflection The reflection class
@@ -193,6 +278,87 @@ class FieldEncryptionListener
 
         if (null !== $plainValue) {
             $this->setPropertyValue($entity, $reflection, $mapping->plainProperty, $plainValue);
+        }
+
+        $this->logger->debug('Decrypted string field', [
+            'entity' => $entity::class,
+            'field' => $mapping->encryptedProperty,
+        ]);
+    }
+
+    /**
+     * Decrypts a single file field.
+     *
+     * @param object           $entity     The entity
+     * @param ReflectionClass  $reflection The reflection class
+     * @param FileFieldMapping $mapping    The file field mapping
+     * @param string           $entityId   The entity ID for key derivation
+     */
+    private function decryptFileField(
+        object $entity,
+        ReflectionClass $reflection,
+        FileFieldMapping $mapping,
+        string $entityId,
+    ): void {
+        $encryptedValue = $this->getPropertyValueDirect($entity, $reflection, $mapping->sourceProperty);
+
+        if (null === $encryptedValue) {
+            return;
+        }
+
+        // Handle resource type (BLOB columns may return stream resources)
+        if (is_resource($encryptedValue)) {
+            $encryptedValue = stream_get_contents($encryptedValue);
+            if ($encryptedValue === false) {
+                $this->logger->error('Failed to read BLOB stream', [
+                    'entity' => $entity::class,
+                    'field' => $mapping->sourceProperty,
+                ]);
+                return;
+            }
+        }
+
+        try {
+            if ($mapping->isDtoType()) {
+                $plainValue = $this->binaryEncryptionService->decryptToFileData($encryptedValue, $entityId);
+            } else {
+                $plainValue = $this->binaryEncryptionService->decrypt($encryptedValue, $entityId);
+            }
+
+            $this->setPropertyValue($entity, $reflection, $mapping->plainProperty, $plainValue);
+
+            $this->logger->debug('Decrypted file field', [
+                'entity' => $entity::class,
+                'field' => $mapping->sourceProperty,
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Failed to decrypt file field', [
+                'entity' => $entity::class,
+                'field' => $mapping->sourceProperty,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Sets metadata properties on the entity from an EncryptedFileData DTO.
+     */
+    private function setMetadataFromDto(
+        object $entity,
+        ReflectionClass $reflection,
+        FileFieldMapping $mapping,
+        EncryptedFileData $fileData,
+    ): void {
+        if ($mapping->mimeTypeProperty !== null) {
+            $this->setPropertyValueDirect($entity, $reflection, $mapping->mimeTypeProperty, $fileData->getMimeType());
+        }
+
+        if ($mapping->originalNameProperty !== null) {
+            $this->setPropertyValueDirect($entity, $reflection, $mapping->originalNameProperty, $fileData->getOriginalName());
+        }
+
+        if ($mapping->originalSizeProperty !== null) {
+            $this->setPropertyValueDirect($entity, $reflection, $mapping->originalSizeProperty, $fileData->getSize());
         }
     }
 

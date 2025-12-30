@@ -6,6 +6,8 @@ namespace Caeligo\FieldEncryptionBundle\Service;
 
 use Caeligo\FieldEncryptionBundle\Attribute\Encrypted;
 use Caeligo\FieldEncryptionBundle\Attribute\EncryptedEntity;
+use Caeligo\FieldEncryptionBundle\Attribute\EncryptedFile;
+use Caeligo\FieldEncryptionBundle\Exception\PropertyNotFoundException;
 use ReflectionClass;
 use ReflectionProperty;
 
@@ -13,10 +15,10 @@ use ReflectionProperty;
  * Resolves encrypted field mappings from entity classes.
  *
  * This service analyzes entity classes to find properties marked with the #[Encrypted]
- * attribute and builds a mapping structure for the encryption listener.
+ * or #[EncryptedFile] attributes and builds a mapping structure for the encryption listener.
  *
  * It supports both:
- * - Attribute-based configuration (#[Encrypted] on properties)
+ * - Attribute-based configuration (#[Encrypted] and #[EncryptedFile] on properties)
  * - YAML-based configuration (from bundle configuration)
  *
  * @author Bíró Gábor (biga156)
@@ -24,9 +26,19 @@ use ReflectionProperty;
 class FieldMappingResolver
 {
     /**
-     * @var array<string, array<string, FieldMapping>> Cached mappings per entity class
+     * @var array<string, array<string, FieldMapping>> Cached string field mappings per entity class
      */
     private array $cache = [];
+
+    /**
+     * @var array<string, array<string, FileFieldMapping>> Cached file field mappings per entity class
+     */
+    private array $fileCache = [];
+
+    /**
+     * @var array<string, bool> Cache for property validation results
+     */
+    private array $validatedClasses = [];
 
     /**
      * @var array<string, array{id_property?: string, fields?: array<string, array{encrypted_property?: string, plain_property?: string, hash_field?: bool, hash_property?: string}>}>
@@ -42,7 +54,7 @@ class FieldMappingResolver
     }
 
     /**
-     * Get all encrypted field mappings for an entity.
+     * Get all encrypted string field mappings for an entity.
      *
      * @param object $entity The entity to analyze
      *
@@ -93,7 +105,52 @@ class FieldMappingResolver
     }
 
     /**
-     * Check if an entity has any encrypted fields.
+     * Get all encrypted file field mappings for an entity.
+     *
+     * @param object $entity The entity to analyze
+     *
+     * @return array<string, FileFieldMapping> Array of file field mappings keyed by source property name
+     *
+     * @throws PropertyNotFoundException If a configured metadata property does not exist
+     */
+    public function getFileMappings(object $entity): array
+    {
+        $className = $entity::class;
+
+        if (isset($this->fileCache[$className])) {
+            return $this->fileCache[$className];
+        }
+
+        $mappings = [];
+        $reflection = new ReflectionClass($entity);
+        $idMethod = $this->resolveIdMethod($reflection, $className);
+
+        foreach ($reflection->getProperties() as $property) {
+            $attributes = $property->getAttributes(EncryptedFile::class);
+
+            if (empty($attributes)) {
+                continue;
+            }
+
+            /** @var EncryptedFile $encryptedFile */
+            $encryptedFile = $attributes[0]->newInstance();
+
+            $mapping = $this->createFileMappingFromAttribute($property, $encryptedFile);
+            $mapping->idMethod = $idMethod;
+
+            // Validate metadata properties exist
+            $this->validateFileMappingProperties($reflection, $mapping, $className);
+
+            $mappings[$property->getName()] = $mapping;
+        }
+
+        $this->fileCache[$className] = $mappings;
+
+        return $mappings;
+    }
+
+    /**
+     * Check if an entity has any encrypted fields (string or file).
      *
      * @param object $entity The entity to check
      *
@@ -101,7 +158,31 @@ class FieldMappingResolver
      */
     public function hasEncryptedFields(object $entity): bool
     {
+        return !empty($this->getMappings($entity)) || !empty($this->getFileMappings($entity));
+    }
+
+    /**
+     * Check if an entity has any encrypted string fields.
+     *
+     * @param object $entity The entity to check
+     *
+     * @return bool True if the entity has encrypted string fields
+     */
+    public function hasEncryptedStringFields(object $entity): bool
+    {
         return !empty($this->getMappings($entity));
+    }
+
+    /**
+     * Check if an entity has any encrypted file fields.
+     *
+     * @param object $entity The entity to check
+     *
+     * @return bool True if the entity has encrypted file fields
+     */
+    public function hasEncryptedFileFields(object $entity): bool
+    {
+        return !empty($this->getFileMappings($entity));
     }
 
     /**
@@ -114,8 +195,26 @@ class FieldMappingResolver
     public function getIdMethod(object $entity): string
     {
         $mappings = $this->getMappings($entity);
+        if (!empty($mappings)) {
+            return reset($mappings)->idMethod;
+        }
 
-        return !empty($mappings) ? reset($mappings)->idMethod : 'getId';
+        $fileMappings = $this->getFileMappings($entity);
+        if (!empty($fileMappings)) {
+            return reset($fileMappings)->idMethod;
+        }
+
+        return 'getId';
+    }
+
+    /**
+     * Get all entity classes that have encrypted fields from YAML config.
+     *
+     * @return array<string> List of entity class names
+     */
+    public function getConfiguredEntityClasses(): array
+    {
+        return array_keys($this->yamlConfig);
     }
 
     /**
@@ -164,6 +263,26 @@ class FieldMappingResolver
     }
 
     /**
+     * Creates a FileFieldMapping from an EncryptedFile attribute.
+     */
+    private function createFileMappingFromAttribute(ReflectionProperty $property, EncryptedFile $encryptedFile): FileFieldMapping
+    {
+        $propertyName = $property->getName();
+
+        return new FileFieldMapping(
+            sourceProperty: $propertyName,
+            plainProperty: $encryptedFile->getPlainPropertyName($propertyName),
+            plainType: $encryptedFile->plainType,
+            mimeTypeProperty: $encryptedFile->mimeTypeProperty,
+            originalNameProperty: $encryptedFile->originalNameProperty,
+            originalSizeProperty: $encryptedFile->originalSizeProperty,
+            compress: $encryptedFile->compress,
+            maxSize: $encryptedFile->maxSize,
+            chunkSize: $encryptedFile->chunkSize,
+        );
+    }
+
+    /**
      * Creates a FieldMapping from YAML configuration.
      *
      * @param string $propertyName The source property name
@@ -178,5 +297,54 @@ class FieldMappingResolver
             hashField: $config['hash_field'] ?? false,
             hashProperty: $config['hash_property'] ?? (($config['hash_field'] ?? false) ? $propertyName . 'Hash' : null),
         );
+    }
+
+    /**
+     * Validate that all configured metadata properties exist on the entity.
+     *
+     * @throws PropertyNotFoundException If a configured property does not exist
+     */
+    private function validateFileMappingProperties(
+        ReflectionClass $reflection,
+        FileFieldMapping $mapping,
+        string $className,
+    ): void {
+        // Skip if already validated
+        $cacheKey = $className . '::' . $mapping->sourceProperty;
+        if (isset($this->validatedClasses[$cacheKey])) {
+            return;
+        }
+
+        // Validate plain property exists
+        if (!$reflection->hasProperty($mapping->plainProperty)) {
+            throw new PropertyNotFoundException($mapping->plainProperty, $className);
+        }
+
+        // Validate metadata properties if configured
+        if ($mapping->mimeTypeProperty !== null && !$reflection->hasProperty($mapping->mimeTypeProperty)) {
+            throw PropertyNotFoundException::metadataProperty(
+                $mapping->mimeTypeProperty,
+                $className,
+                'mimeTypeProperty'
+            );
+        }
+
+        if ($mapping->originalNameProperty !== null && !$reflection->hasProperty($mapping->originalNameProperty)) {
+            throw PropertyNotFoundException::metadataProperty(
+                $mapping->originalNameProperty,
+                $className,
+                'originalNameProperty'
+            );
+        }
+
+        if ($mapping->originalSizeProperty !== null && !$reflection->hasProperty($mapping->originalSizeProperty)) {
+            throw PropertyNotFoundException::metadataProperty(
+                $mapping->originalSizeProperty,
+                $className,
+                'originalSizeProperty'
+            );
+        }
+
+        $this->validatedClasses[$cacheKey] = true;
     }
 }
