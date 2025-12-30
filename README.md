@@ -15,8 +15,8 @@ A reusable Symfony bundle for transparent Doctrine entity field encryption using
 ## Requirements
 
 - PHP 8.2+
-- Symfony 7.0+
-- Doctrine ORM 3.0+
+- Symfony 6.4+ or 7.0+
+- Doctrine ORM 2.14+ or 3.0+
 
 ## Installation
 
