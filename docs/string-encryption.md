@@ -47,6 +47,27 @@ if ($encryptionService->hashEquals($hash1, $hash2)) {
 }
 ```
 
+### Plain vs Secure Hash
+
+The bundle provides two hashing methods:
+
+| Method | Algorithm | Key Required | Use Case |
+|--------|-----------|--------------|----------|
+| `hash()` | SHA-256 | No | Backward compatible, existing databases |
+| `secureHash()` | HMAC-SHA256 | Yes (derived) | New projects, higher security |
+
+```php
+// Plain SHA-256 (default, backward compatible)
+$hash = $encryptionService->hash($email);
+
+// HMAC-SHA256 (more secure, requires same key to verify)
+$secureHash = $encryptionService->secureHash($email);
+
+// Verification
+$encryptionService->verifyHash($email, $hash);           // for hash()
+$encryptionService->verifySecureHash($email, $secureHash); // for secureHash()
+```
+
 ## Basic Usage
 
 ### 1. Mark Your Entity

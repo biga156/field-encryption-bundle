@@ -235,28 +235,67 @@ class FieldEncryptionServiceTest extends TestCase
         $this->assertTrue($this->service->verifyHash('  test@example.com  ', $hash));
     }
 
-    public function testHashWithPepperProducesDifferentResults(): void
+    public function testPlainHashIsConsistentAcrossInstances(): void
     {
-        $serviceWithoutPepper = new FieldEncryptionService(self::TEST_KEY);
-        $serviceWithPepper = new FieldEncryptionService(self::TEST_KEY, 'custom-pepper-key');
-
-        $hash1 = $serviceWithoutPepper->hash('test@example.com');
-        $hash2 = $serviceWithPepper->hash('test@example.com');
-
-        // Different pepper should produce different hashes
-        $this->assertNotEquals($hash1, $hash2);
-    }
-
-    public function testHashWithSamePepperProducesSameResults(): void
-    {
-        $service1 = new FieldEncryptionService(self::TEST_KEY, 'same-pepper');
-        $service2 = new FieldEncryptionService(self::TEST_KEY, 'same-pepper');
+        // Plain hash (SHA-256) should be the same regardless of key or pepper
+        $service1 = new FieldEncryptionService(self::TEST_KEY);
+        $service2 = new FieldEncryptionService(self::TEST_KEY, 'custom-pepper-key');
 
         $hash1 = $service1->hash('test@example.com');
         $hash2 = $service2->hash('test@example.com');
 
-        // Same pepper should produce same hashes
+        // Plain hash should be identical (pepper only affects secureHash)
         $this->assertEquals($hash1, $hash2);
+    }
+
+    public function testSecureHashWithDifferentPeppersProducesDifferentResults(): void
+    {
+        $serviceWithoutPepper = new FieldEncryptionService(self::TEST_KEY);
+        $serviceWithPepper = new FieldEncryptionService(self::TEST_KEY, 'custom-pepper-key');
+
+        $hash1 = $serviceWithoutPepper->secureHash('test@example.com');
+        $hash2 = $serviceWithPepper->secureHash('test@example.com');
+
+        // Different pepper should produce different secure hashes
+        $this->assertNotEquals($hash1, $hash2);
+    }
+
+    public function testSecureHashWithSamePepperProducesSameResults(): void
+    {
+        $service1 = new FieldEncryptionService(self::TEST_KEY, 'same-pepper');
+        $service2 = new FieldEncryptionService(self::TEST_KEY, 'same-pepper');
+
+        $hash1 = $service1->secureHash('test@example.com');
+        $hash2 = $service2->secureHash('test@example.com');
+
+        // Same pepper should produce same secure hashes
+        $this->assertEquals($hash1, $hash2);
+    }
+
+    public function testVerifySecureHashWithCorrectValue(): void
+    {
+        $value = 'test@example.com';
+        $hash = $this->service->secureHash($value);
+
+        $this->assertTrue($this->service->verifySecureHash($value, $hash));
+    }
+
+    public function testVerifySecureHashWithIncorrectValue(): void
+    {
+        $hash = $this->service->secureHash('correct@example.com');
+
+        $this->assertFalse($this->service->verifySecureHash('wrong@example.com', $hash));
+    }
+
+    public function testPlainHashDiffersFromSecureHash(): void
+    {
+        $value = 'test@example.com';
+
+        $plainHash = $this->service->hash($value);
+        $secureHash = $this->service->secureHash($value);
+
+        // Plain SHA-256 and HMAC-SHA256 should produce different results
+        $this->assertNotEquals($plainHash, $secureHash);
     }
 
     public function testHkdfKeyDerivationIsDeterministic(): void

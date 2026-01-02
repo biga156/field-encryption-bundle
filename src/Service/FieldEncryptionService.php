@@ -122,10 +122,30 @@ class FieldEncryptionService
     }
 
     /**
-     * Creates a keyed hash of the given value for searchability.
+     * Creates a hash of the given value for searchability.
      *
      * This allows searching/matching on encrypted fields without exposing the actual value.
-     * Uses HMAC-SHA256 with a derived key for better security than plain SHA-256.
+     * Uses plain SHA-256 hash with normalized (lowercase, trimmed) input for backward
+     * compatibility with existing databases.
+     *
+     * Note: For new projects requiring higher security, consider using secureHash()
+     * which uses HMAC-SHA256 with a derived key.
+     *
+     * @param string $value The value to hash
+     *
+     * @return string The hex-encoded hash
+     */
+    public function hash(string $value): string
+    {
+        return hash('sha256', mb_strtolower(trim($value)));
+    }
+
+    /**
+     * Creates a keyed hash of the given value using HMAC-SHA256.
+     *
+     * This is more secure than plain hash() as it requires the secret key to generate
+     * the same hash. Use this for new projects where backward compatibility with
+     * existing plain SHA-256 hashes is not required.
      *
      * Security features:
      * - Uses HMAC instead of plain hash (requires secret key)
@@ -135,9 +155,9 @@ class FieldEncryptionService
      *
      * @param string $value The value to hash
      *
-     * @return string The hex-encoded hash
+     * @return string The hex-encoded HMAC hash
      */
-    public function hash(string $value): string
+    public function secureHash(string $value): string
     {
         $key = $this->getDerivedHashKey();
         $normalizedValue = mb_strtolower(trim($value));
@@ -161,7 +181,7 @@ class FieldEncryptionService
     }
 
     /**
-     * Verify that a value matches a stored hash.
+     * Verify that a value matches a stored hash (plain SHA-256).
      *
      * @param string $value      The plaintext value to verify
      * @param string $storedHash The stored hash to compare against
@@ -171,6 +191,19 @@ class FieldEncryptionService
     public function verifyHash(string $value, string $storedHash): bool
     {
         return hash_equals($storedHash, $this->hash($value));
+    }
+
+    /**
+     * Verify that a value matches a stored secure hash (HMAC-SHA256).
+     *
+     * @param string $value      The plaintext value to verify
+     * @param string $storedHash The stored HMAC hash to compare against
+     *
+     * @return bool True if the value matches the hash
+     */
+    public function verifySecureHash(string $value, string $storedHash): bool
+    {
+        return hash_equals($storedHash, $this->secureHash($value));
     }
 
     /**
