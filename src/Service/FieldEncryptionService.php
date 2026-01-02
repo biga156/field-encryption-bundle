@@ -27,14 +27,28 @@ class FieldEncryptionService
 {
     private const CIPHER = 'aes-256-cbc';
 
+    /**
+     * HKDF info constants for key derivation purposes.
+     */
+    private const HKDF_PURPOSE_ENCRYPTION = 'field-encryption-v1';
+    private const HKDF_PURPOSE_HASHING = 'field-hashing-v1';
+
     private string $encryptionKey;
+    private ?string $hashPepper;
 
     /**
-     * @param string $encryptionKey The encryption key from environment variable
+     * Derived keys (cached for performance).
      */
-    public function __construct(string $encryptionKey)
+    private ?string $derivedHashKey = null;
+
+    /**
+     * @param string      $encryptionKey The encryption key from environment variable
+     * @param string|null $hashPepper    Optional separate pepper for hashing (defaults to encryption key)
+     */
+    public function __construct(string $encryptionKey, ?string $hashPepper = null)
     {
         $this->encryptionKey = $encryptionKey;
+        $this->hashPepper = $hashPepper;
     }
 
     /**
@@ -108,10 +122,16 @@ class FieldEncryptionService
     }
 
     /**
-     * Creates a hash of the given value for searchability.
+     * Creates a keyed hash of the given value for searchability.
      *
      * This allows searching/matching on encrypted fields without exposing the actual value.
-     * Uses plain SHA-256 hash with normalized (lowercase, trimmed) input.
+     * Uses HMAC-SHA256 with a derived key for better security than plain SHA-256.
+     *
+     * Security features:
+     * - Uses HMAC instead of plain hash (requires secret key)
+     * - Derives hash key using HKDF for key separation
+     * - Uses separate pepper if configured
+     * - Deterministic output for searchability
      *
      * @param string $value The value to hash
      *
@@ -119,11 +139,63 @@ class FieldEncryptionService
      */
     public function hash(string $value): string
     {
-        return hash('sha256', mb_strtolower(trim($value)));
+        $key = $this->getDerivedHashKey();
+        $normalizedValue = mb_strtolower(trim($value));
+
+        return hash_hmac('sha256', $normalizedValue, $key);
+    }
+
+    /**
+     * Securely compare two hashes using constant-time comparison.
+     *
+     * This prevents timing attacks when comparing hash values.
+     *
+     * @param string $hash1 First hash to compare
+     * @param string $hash2 Second hash to compare
+     *
+     * @return bool True if hashes match
+     */
+    public function hashEquals(string $hash1, string $hash2): bool
+    {
+        return hash_equals($hash1, $hash2);
+    }
+
+    /**
+     * Verify that a value matches a stored hash.
+     *
+     * @param string $value      The plaintext value to verify
+     * @param string $storedHash The stored hash to compare against
+     *
+     * @return bool True if the value matches the hash
+     */
+    public function verifyHash(string $value, string $storedHash): bool
+    {
+        return hash_equals($storedHash, $this->hash($value));
+    }
+
+    /**
+     * Get the derived key for hashing operations.
+     *
+     * Uses HKDF to derive a separate key for hashing from the master key or pepper.
+     *
+     * @return string The derived hash key
+     */
+    private function getDerivedHashKey(): string
+    {
+        if ($this->derivedHashKey === null) {
+            $sourceKey = $this->hashPepper ?? $this->encryptionKey;
+            $this->derivedHashKey = hash_hkdf('sha256', $sourceKey, 32, self::HKDF_PURPOSE_HASHING);
+        }
+
+        return $this->derivedHashKey;
     }
 
     /**
      * Derives the encryption key from the entity ID and the master encryption key.
+     *
+     * Uses HKDF (HMAC-based Key Derivation Function) for secure key derivation:
+     * 1. First derives a purpose-specific key from the master key
+     * 2. Then derives an entity-specific key for actual encryption
      *
      * @param string $entityId The unique entity identifier
      *
@@ -131,7 +203,11 @@ class FieldEncryptionService
      */
     private function deriveKey(string $entityId): string
     {
-        return hash_hmac('sha256', $entityId, $this->encryptionKey);
+        // Derive purpose-specific key using HKDF
+        $purposeKey = hash_hkdf('sha256', $this->encryptionKey, 32, self::HKDF_PURPOSE_ENCRYPTION);
+
+        // Derive entity-specific key
+        return hash_hmac('sha256', $entityId, $purposeKey);
     }
 
     /**

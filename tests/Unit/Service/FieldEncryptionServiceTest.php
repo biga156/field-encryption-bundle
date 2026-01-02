@@ -194,4 +194,106 @@ class FieldEncryptionServiceTest extends TestCase
         $this->assertArrayHasKey('iv', $json);
         $this->assertArrayHasKey('value', $json);
     }
+
+    public function testHashEqualsWithMatchingHashes(): void
+    {
+        $hash1 = $this->service->hash('test@example.com');
+        $hash2 = $this->service->hash('test@example.com');
+
+        $this->assertTrue($this->service->hashEquals($hash1, $hash2));
+    }
+
+    public function testHashEqualsWithDifferentHashes(): void
+    {
+        $hash1 = $this->service->hash('test1@example.com');
+        $hash2 = $this->service->hash('test2@example.com');
+
+        $this->assertFalse($this->service->hashEquals($hash1, $hash2));
+    }
+
+    public function testVerifyHashWithCorrectValue(): void
+    {
+        $value = 'test@example.com';
+        $hash = $this->service->hash($value);
+
+        $this->assertTrue($this->service->verifyHash($value, $hash));
+    }
+
+    public function testVerifyHashWithIncorrectValue(): void
+    {
+        $hash = $this->service->hash('correct@example.com');
+
+        $this->assertFalse($this->service->verifyHash('wrong@example.com', $hash));
+    }
+
+    public function testVerifyHashNormalizesInput(): void
+    {
+        $hash = $this->service->hash('test@example.com');
+
+        // Should match with different cases and whitespace
+        $this->assertTrue($this->service->verifyHash('TEST@EXAMPLE.COM', $hash));
+        $this->assertTrue($this->service->verifyHash('  test@example.com  ', $hash));
+    }
+
+    public function testHashWithPepperProducesDifferentResults(): void
+    {
+        $serviceWithoutPepper = new FieldEncryptionService(self::TEST_KEY);
+        $serviceWithPepper = new FieldEncryptionService(self::TEST_KEY, 'custom-pepper-key');
+
+        $hash1 = $serviceWithoutPepper->hash('test@example.com');
+        $hash2 = $serviceWithPepper->hash('test@example.com');
+
+        // Different pepper should produce different hashes
+        $this->assertNotEquals($hash1, $hash2);
+    }
+
+    public function testHashWithSamePepperProducesSameResults(): void
+    {
+        $service1 = new FieldEncryptionService(self::TEST_KEY, 'same-pepper');
+        $service2 = new FieldEncryptionService(self::TEST_KEY, 'same-pepper');
+
+        $hash1 = $service1->hash('test@example.com');
+        $hash2 = $service2->hash('test@example.com');
+
+        // Same pepper should produce same hashes
+        $this->assertEquals($hash1, $hash2);
+    }
+
+    public function testHkdfKeyDerivationIsDeterministic(): void
+    {
+        // Same key and entity ID should always produce the same encrypted result
+        // when using the same IV (we can't test this directly, but we can verify
+        // that decryption works consistently)
+        $service1 = new FieldEncryptionService(self::TEST_KEY);
+        $service2 = new FieldEncryptionService(self::TEST_KEY);
+
+        $plaintext = 'Test message';
+        $entityId = 'entity-123';
+
+        $encrypted = $service1->encrypt($plaintext, $entityId);
+
+        // Service2 should be able to decrypt what service1 encrypted
+        $decrypted = $service2->decrypt($encrypted, $entityId);
+
+        $this->assertEquals($plaintext, $decrypted);
+    }
+
+    public function testDifferentKeysProduceDifferentEncryption(): void
+    {
+        $key1 = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2';
+        $key2 = 'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3';
+
+        $service1 = new FieldEncryptionService($key1);
+        $service2 = new FieldEncryptionService($key2);
+
+        $plaintext = 'Test message';
+        $entityId = 'entity-123';
+
+        $encrypted1 = $service1->encrypt($plaintext, $entityId);
+
+        // Service2 should NOT be able to decrypt what service1 encrypted
+        $decrypted = $service2->decrypt($encrypted1, $entityId);
+
+        $this->assertNotEquals($plaintext, $decrypted);
+    }
 }

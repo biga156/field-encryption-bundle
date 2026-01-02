@@ -10,6 +10,9 @@ field_encryption:
     # Required: The encryption key (64-character hex string)
     encryption_key: '%env(FIELD_ENCRYPTION_KEY)%'
     
+    # Optional: Separate pepper for hash operations (better key separation)
+    hash_pepper: '%env(FIELD_ENCRYPTION_HASH_PEPPER)%'
+    
     # Key version for rotation support (default: 1)
     key_version: 1
     
@@ -61,6 +64,18 @@ Generate with:
 ```bash
 php bin/console field-encryption:generate-key
 ```
+
+### `hash_pepper`
+
+Type: `string` | Default: `null` (uses encryption_key)
+
+Optional separate key for hash operations. Provides better key separation - if this pepper is ever compromised, it only affects hash verification, not decryption.
+
+```yaml
+hash_pepper: '%env(FIELD_ENCRYPTION_HASH_PEPPER)%'
+```
+
+**Security note:** Using a separate pepper means that even if someone obtains the encryption key, they cannot verify hashes without also obtaining the pepper.
 
 ### `key_version`
 

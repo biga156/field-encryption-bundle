@@ -69,6 +69,11 @@ class BinaryEncryptionService
     private const TAG_LENGTH = 16;
 
     /**
+     * HKDF info constant for binary encryption key derivation.
+     */
+    private const HKDF_PURPOSE_BINARY_ENCRYPTION = 'binary-encryption-v1';
+
+    /**
      * Header size (magic + version + key_version + flags + metadata_length).
      */
     private const HEADER_SIZE = 9;
@@ -468,6 +473,10 @@ class BinaryEncryptionService
     /**
      * Derive the encryption key from a master key and entity ID.
      *
+     * Uses HKDF (HMAC-based Key Derivation Function) for secure key derivation:
+     * 1. First derives a purpose-specific key from the master key using HKDF
+     * 2. Then derives an entity-specific key for actual encryption
+     *
      * @param string $masterKey The master key (hex-encoded)
      * @param string $entityId  The entity ID
      *
@@ -475,9 +484,11 @@ class BinaryEncryptionService
      */
     private function deriveKeyFromMaster(string $masterKey, string $entityId): string
     {
-        // Use HKDF-like derivation: HMAC-SHA256(masterKey, entityId)
-        // The result is 32 bytes (256 bits), perfect for AES-256
-        return hash_hmac('sha256', $entityId, hex2bin($masterKey), true);
+        // Derive purpose-specific key using HKDF
+        $purposeKey = hash_hkdf('sha256', hex2bin($masterKey), 32, self::HKDF_PURPOSE_BINARY_ENCRYPTION);
+
+        // Derive entity-specific key
+        return hash_hmac('sha256', $entityId, $purposeKey, true);
     }
 
     /**

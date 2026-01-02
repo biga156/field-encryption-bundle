@@ -9,8 +9,10 @@ A Symfony bundle for transparent Doctrine entity field encryption using AES-256-
 ## Features
 
 - 🔐 **Automatic encryption/decryption** - Transparent for your application code
-- 📝 **String field encryption** - AES-256-CBC with optional SHA-256 hash for searching
+- 📝 **String field encryption** - AES-256-CBC with HMAC-SHA256 hash for searching
 - 📁 **Binary file encryption** - AES-256-GCM for documents, images, etc.
+- 🔑 **HKDF key derivation** - Cryptographic key separation for different purposes
+- 🛡️ **Timing-safe comparison** - Protection against timing attacks on hash verification
 - 🏷️ **Attribute-based configuration** - Simple `#[Encrypted]` and `#[EncryptedFile]` attributes
 - 🔄 **Key rotation support** - Safely rotate keys with progress tracking
 - 🗜️ **Optional compression** - Gzip compression for binary files
@@ -156,6 +158,19 @@ php bin/console field-encryption:encrypt-existing --dry-run
 - 🔄 **Plan key rotation** - Use the wizard for safe rotation
 - 🔍 **Use hashes for search** - Enable `hashField` for searchable fields
 - 🆔 **Use ULID/UUID** - Don't use sequential integers for key derivation
+- 🌶️ **Consider hash pepper** - Use `hash_pepper` config for extra key separation
+
+### Database Compromise Protection
+
+This bundle provides strong protection if only your database is compromised:
+
+| Attacker sees | Can read? | Notes |
+|---------------|-----------|-------|
+| Encrypted fields | ❌ No | AES-256 encrypted |
+| Hash fields | ⚠️ Hash only | HMAC-SHA256, not reversible |
+| Plain metadata | ✅ Yes | Store sensitive metadata separately |
+
+**Key requirement**: The encryption key must NOT be stored in the database.
 
 ## License
 

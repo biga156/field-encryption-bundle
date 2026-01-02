@@ -35,6 +35,7 @@ class FieldEncryptionExtension extends Extension
 
         // Store configuration as container parameters
         $container->setParameter('field_encryption.encryption_key', $config['encryption_key']);
+        $container->setParameter('field_encryption.hash_pepper', $config['hash_pepper']);
         $container->setParameter('field_encryption.key_version', $config['key_version']);
         $container->setParameter('field_encryption.previous_keys', $config['previous_keys'] ?? []);
         $container->setParameter('field_encryption.file_encryption.max_size', $config['file_encryption']['max_size']);
@@ -47,6 +48,7 @@ class FieldEncryptionExtension extends Extension
         // Register FieldEncryptionService (for string fields)
         $encryptionServiceDef = new Definition(FieldEncryptionService::class);
         $encryptionServiceDef->setArgument('$encryptionKey', '%field_encryption.encryption_key%');
+        $encryptionServiceDef->setArgument('$hashPepper', '%field_encryption.hash_pepper%');
         $encryptionServiceDef->setPublic(false);
         $container->setDefinition(FieldEncryptionService::class, $encryptionServiceDef);
         $container->setAlias('field_encryption.encryption_service', FieldEncryptionService::class);

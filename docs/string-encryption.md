@@ -7,8 +7,45 @@ This document covers the encryption of text/string fields in Doctrine entities u
 String field encryption is designed for sensitive text data like emails, names, phone numbers, etc. The bundle uses:
 
 - **Algorithm**: AES-256-CBC
-- **Key derivation**: HMAC-SHA256(entity_id, master_key)
+- **Key derivation**: HKDF-SHA256 for purpose separation, then HMAC-SHA256(entity_id, derived_key)
+- **Hash algorithm**: HMAC-SHA256 with dedicated hash key (derived via HKDF)
 - **Storage format**: Base64-encoded JSON containing IV and encrypted value
+
+## Security Features
+
+### HKDF Key Derivation
+
+The bundle uses HKDF (HMAC-based Key Derivation Function) to derive separate keys for different purposes:
+
+```
+Master Key
+    ├── HKDF("field-encryption-v1") → Encryption Purpose Key
+    │       └── HMAC(entity_id) → Entity-specific Encryption Key
+    │
+    └── HKDF("field-hashing-v1") → Hashing Purpose Key
+            └── HMAC(value) → Searchable Hash
+```
+
+This provides **cryptographic separation** - compromising one derived key doesn't compromise others.
+
+### Timing-Safe Hash Comparison
+
+The bundle provides timing-safe hash comparison to prevent timing attacks:
+
+```php
+// In your code
+$encryptionService = $this->container->get(FieldEncryptionService::class);
+
+// Verify a value against a stored hash (timing-safe)
+if ($encryptionService->verifyHash($userInput, $storedHash)) {
+    // Value matches
+}
+
+// Or compare two hashes directly
+if ($encryptionService->hashEquals($hash1, $hash2)) {
+    // Hashes match
+}
+```
 
 ## Basic Usage
 
